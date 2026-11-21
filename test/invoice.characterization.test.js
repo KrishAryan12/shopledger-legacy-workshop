@@ -17,42 +17,38 @@ const cases = [
     invoiceLines: [[18, 25.20], [18, 64.80]]
   },
   {
-    name: 'CURRENT BEHAVIOUR: #1001 invoice taxes the 5% item at 18%',
-    // The invoice should show GST of 66.90 and a total of 676.90.
+    name: '#1001 invoice applies the 5% HSN rate',
     items: [item('0902', 140, 2), item('0713', 165, 2)],
     checkout: [610, 0, 66.90, 33.45, 33.45, 676.90],
-    invoice: [610, 0, 109.80, 54.90, 54.90, 719.80],
+    invoice: [610, 0, 66.90, 33.45, 33.45, 676.90],
     checkoutLines: [[18, 50.40], [5, 16.50]],
-    invoiceLines: [[18, 50.40], [18, 59.40]]
+    invoiceLines: [[18, 50.40], [5, 16.50]]
   },
   {
-    name: 'CURRENT BEHAVIOUR: #1007 invoice taxes the 12% and 5% items at 18%',
-    // The invoice should show GST of 127.00 and a total of 1407.00.
+    name: '#1007 invoice applies the 12% and 5% HSN rates',
     items: [item('0405', 450, 2), item('1512', 190, 2)],
     checkout: [1280, 0, 127, 63.50, 63.50, 1407],
-    invoice: [1280, 0, 230.40, 115.20, 115.20, 1510.40],
+    invoice: [1280, 0, 127, 63.50, 63.50, 1407],
     checkoutLines: [[12, 108], [5, 19]],
-    invoiceLines: [[18, 162], [18, 68.40]]
+    invoiceLines: [[12, 108], [5, 19]]
   },
   {
-    name: 'CURRENT BEHAVIOUR: #1002 SAVE10 invoice discounts the GST-inclusive amount',
-    // The invoice should show discount of 102.00, GST of 45.90 and a total of 963.90.
+    name: '#1002 invoice applies SAVE10 before GST',
     items: [item('1006', 640), item('1512', 190, 2)],
     coupon: 'SAVE10',
     checkout: [1020, 102, 45.90, 22.95, 22.95, 963.90],
-    invoice: [1020, 120.36, 183.60, 91.80, 91.80, 1083.24],
+    invoice: [1020, 102, 45.90, 22.95, 22.95, 963.90],
     checkoutLines: [[5, 28.80], [5, 17.10]],
-    invoiceLines: [[18, 115.20], [18, 68.40]]
+    invoiceLines: [[5, 28.80], [5, 17.10]]
   },
   {
-    name: 'CURRENT BEHAVIOUR: #1004 SAVE10 invoice ignores the 150.00 cap',
-    // The invoice should show discount of 150.00, GST of 104.50 and a total of 2194.50.
+    name: '#1004 invoice applies the 150.00 SAVE10 cap before GST',
     items: [item('1508', 1120, 2)],
     coupon: 'SAVE10',
     checkout: [2240, 150, 104.50, 52.25, 52.25, 2194.50],
-    invoice: [2240, 264.32, 403.20, 201.60, 201.60, 2378.88],
+    invoice: [2240, 150, 104.50, 52.25, 52.25, 2194.50],
     checkoutLines: [[5, 104.50]],
-    invoiceLines: [[18, 403.20]]
+    invoiceLines: [[5, 104.50]]
   },
   {
     name: 'both engines return zero for an empty cart',
@@ -63,14 +59,13 @@ const cases = [
     invoiceLines: []
   },
   {
-    name: 'CURRENT BEHAVIOUR: mixed 5%, 12% and 18% cart with fractional-paise GST',
-    // The invoice should show discount of 50.01, GST of 63.90 and a total of 513.99.
+    name: 'mixed-slab invoice uses the same line GST rounding as checkout',
     items: [item('1006', 100.05), item('0405', 100.05), item('0902', 300)],
     coupon: 'SAVE10',
     checkout: [500.10, 50.01, 63.90, 31.95, 31.95, 513.99],
-    invoice: [500.10, 59.01, 90.02, 45.01, 45.01, 531.11],
+    invoice: [500.10, 50.01, 63.90, 31.95, 31.95, 513.99],
     checkoutLines: [[5, 4.50], [12, 10.80], [18, 48.60]],
-    invoiceLines: [[18, 18.01], [18, 18.01], [18, 54]]
+    invoiceLines: [[5, 4.50], [12, 10.80], [18, 48.60]]
   },
   {
     name: 'both calculation engines apply no discount for an unknown coupon',
@@ -99,5 +94,26 @@ for (const example of cases) {
       example.checkoutLines, 'checkout line GST');
     assert.deepEqual(invoice.rows.map(row => [row.gstPercent, row.lineTax]),
       example.invoiceLines, 'invoice line GST');
+  });
+}
+
+const billedOrders = [
+  [1008, cases[0]],
+  [1001, cases[1]],
+  [1007, cases[2]],
+  [1002, cases[3]],
+  [1004, cases[4]]
+];
+
+for (const [id, example] of billedOrders) {
+  test(`#${id} invoice preserves the billed amounts and checkout line GST`, () => {
+    const [subtotal, discount, tax, , , total] = example.checkout;
+    const invoice = computeInvoiceFigures({
+      id, items: example.items, coupon: example.coupon || '', subtotal, discount, tax, total
+    });
+
+    assert.deepEqual(amounts(invoice), example.checkout, 'billed amounts');
+    assert.deepEqual(invoice.rows.map(row => [row.gstPercent, row.lineTax]),
+      example.checkoutLines, 'billed line GST');
   });
 }

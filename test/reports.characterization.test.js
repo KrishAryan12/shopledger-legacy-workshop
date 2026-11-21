@@ -2,8 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { getGstReconciliation } = require('../lib/reports');
 
-test('CURRENT BEHAVIOUR: GST Audit flags #1002 and matches #1008', () => {
-  // #1002 should match the ledger at 45.90 GST and 963.90 total, with zero mismatches.
+test('GST Audit matches both #1002 and #1008 to the billed amounts', () => {
   const result = getGstReconciliation({ orders: [
     {
       id: 1002, coupon: 'SAVE10', subtotal: 1020, discount: 102, tax: 45.90, total: 963.90,
@@ -16,12 +15,12 @@ test('CURRENT BEHAVIOUR: GST Audit flags #1002 and matches #1008', () => {
   ] });
 
   assert.equal(result.totalChecked, 2);
-  assert.equal(result.mismatchCount, 1);
-  assert.equal(result.totalDelta, 119.34);
+  assert.equal(result.mismatchCount, 0);
+  assert.equal(result.totalDelta, 0);
   assert.deepEqual(result.rows.map(row => [
     row.orderId, row.ledgerTax, row.invoiceTax, row.ledgerTotal, row.invoiceTotal, row.delta, row.matched
   ]), [
-    [1002, 45.90, 183.60, 963.90, 1083.24, 119.34, false],
+    [1002, 45.90, 45.90, 963.90, 963.90, 0, true],
     [1008, 90, 90, 590, 590, 0, true]
   ]);
 });
